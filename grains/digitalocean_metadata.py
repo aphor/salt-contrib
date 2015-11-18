@@ -23,6 +23,11 @@ def digitalocean():
     '''
     Return DigitalOcean metadata.
     '''
+    salt.utils.warn_until(
+        'Carbon',
+        'grains.digitalocean_metadata is deprecated (Digital Ocean APIv1 is no longer avaialble). ' +
+        'This module will be removed in SaltStack Carbon. Please use grains.digitalocean (APIv2) instead.')
+
     do_svr = 'http://169.254.169.254/metadata/v1.json'
     metadata = requests.get(do_svr)
 
