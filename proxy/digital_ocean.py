@@ -20,6 +20,10 @@ To assist in migration from salt cloud, the digital_ocean proxy minion is design
    * available images
    * allocated floating (NAT mapped virtual) IPs
 
+https://docs.saltstack.com/en/latest/topics/proxyminion/index.html
+https://docs.saltstack.com/en/develop/topics/topology/proxyminion/index.html
+https://docs.saltstack.com/en/develop/topics/proxyminion/demo.html
+
 '''
 from __future__ import absolute_import
 
