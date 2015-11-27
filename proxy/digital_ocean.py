@@ -28,10 +28,18 @@ https://docs.saltstack.com/en/develop/topics/proxyminion/demo.html
 from __future__ import absolute_import
 
 # Import python libs
-import logging
+import crypt, logging
+from salt.utils.decorators import depends
 import salt.utils.http
 
-HAS_REST_EXAMPLE = True
+from distutils.version import LooseVersion as _LooseVersion
+try:
+  import digitalocean as DO # requires https://pypi.python.org/pypi/python-digitalocean
+  HAVE_DIGITALOCEAN = lambda _ver_: _LooseVersion(digitalocean.__version__) >= _LooseVersion(_ver_)
+except ImportError as DIGITALOCEAN_IMPORT_EXCEPTION:
+  log.info('cannot import python-digitalocean')
+  HAVE_DIGITALOCEAN = lambda _ver_: False
+  log.info(DIGITALOCEAN_IMPORT_EXCEPTION)
 
 # This must be present or the Salt loader won't load this module
 __proxyenabled__ = ['digital_ocean']
@@ -46,38 +54,36 @@ DETAILS = {}
 log = logging.getLogger(__file__)
 
 
-# This does nothing, it's here just as an example and to provide a log
-# entry when the module is loaded.
 def __virtual__():
     '''
-    Only return if all the modules are available
+    Only load this module if running as a proxy minion and have sufficient version of digitalocean module.
     '''
-    log.debug('digital_ocean proxy __virtual__() called...')
-    return True
-
-# Every proxy module needs an 'init', though you can
-# just put a 'pass' here if it doesn't need to do anything.
+    if salt.utils.is_proxy() and HAVE_DIGITALOCEAN('1.8'):
+        return __virtualname__
+    else:
+        return False
 
 
 def init(opts):
+    '''
+    Populate DETAILS with copy of opts
+    '''
     log.debug('digital_ocean proxy init() called...')
-
-    # Save the REST URL
-    DETAILS['url'] = opts['proxy']['url']
-
-    # Make sure the REST URL ends with a '/'
-    if not DETAILS['url'].endswith('/'):
-        DETAILS['url'] += '/'
+    DETAILS.update(opts)
 
 
 def id(opts):
     '''
-    Return a unique ID for this proxy minion.  This ID MUST NOT CHANGE.
-    If it changes while the proxy is running the salt-master will get
-    really confused and may stop talking to this minion
+    Return a unique ID for this proxy minion.
+    This is a crypt() hash of the Digtital Ocean API key.
+    If a crypt_salt is specified in options, it will be used to generate the ID.
     '''
-    r = salt.utils.http.query(opts['proxy']['url']+'id', decode_type='json', decode=True)
-    return r['dict']['id'].encode('ascii', 'ignore')
+    key = opts['proxy']['apikey']
+    if 'crypt_salt' in opts['proxy']:
+      crypt_salt = opts['proxy']['crypt_salt']
+    else:
+      crypt_salt = 'DigitalOceanAPIv2'
+    return crypt().encode('ascii', 'ignore')
 
 
 def grains():
@@ -85,8 +91,10 @@ def grains():
     Get the grains from the proxied device
     '''
     if not GRAINS_CACHE:
+        GRAINS_CACHE = {}
+        GRAINS_CACHE.update(DETAILS)
         r = salt.utils.http.query(DETAILS['url']+'info', decode_type='json', decode=True)
-        GRAINS_CACHE = r['dict']
+        GRAINS_CACHE.update(r['dict'])
     return GRAINS_CACHE
 
 
